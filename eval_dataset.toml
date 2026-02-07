@@ -1,0 +1,16 @@
+# Eval dataset configuration
+# Place 5-15 images (with .txt caption files) in the eval_dataset_here/ folder.
+# These images are used to measure loss during training — they are NOT used for training.
+# This gives you a smooth loss curve in TensorBoard to detect overfitting.
+# You can use a small subset of your training images if you don't have separate eval data.
+
+resolutions = [1024]
+
+enable_ar_bucket = true
+min_ar = 0.5
+max_ar = 2.0
+num_ar_buckets = 7
+
+[[directory]]
+path = '$NETWORK_VOLUME/eval_dataset_here'
+num_repeats = 1

@@ -8,6 +8,17 @@ micro_batch_size_per_gpu = 1
 gradient_accumulation_steps = 1
 activation_checkpointing = true
 dataset = 'examples/dataset.toml'
+# Eval dataset for measuring loss on held-out data (smooth loss curve in TensorBoard).
+# Place 5-15 captioned images in the eval_dataset_here/ folder.
+eval_datasets = [
+    {name = 'eval', config = 'examples/eval_dataset.toml'},
+]
+
+# eval settings
+eval_every_n_epochs = 1
+eval_before_first_step = true
+eval_micro_batch_size_per_gpu = 1
+eval_gradient_accumulation_steps = 1
 
 [model]
 type = 'z_image'

@@ -208,6 +208,11 @@ jupyter-lab --ip=0.0.0.0 --allow-root --no-browser \
     --ServerApp.allow_origin='*' --ServerApp.allow_credentials=True \
     --notebook-dir="$NETWORK_VOLUME" &
 
+# Start TensorBoard for monitoring training loss and eval metrics
+# Logs are written to the training output directory during training
+mkdir -p "$NETWORK_VOLUME/training_outputs"
+tensorboard --logdir="$NETWORK_VOLUME/training_outputs" --bind_all --port 6006 &
+
 # Move repository files to the working directory
 if [ -d "/tmp/runpod-diffusion_pipe" ]; then
     # Move the entire repository to working directory
@@ -291,11 +296,14 @@ if [ -d "/tmp/runpod-diffusion_pipe" ]; then
         cp "$NETWORK_VOLUME/runpod-diffusion_pipe/send_lora.sh" /usr/local/bin/
     fi
 
-    # Clean up examples and move dataset.toml
+    # Clean up examples and move dataset.toml + eval_dataset.toml
     if [ -d "$NETWORK_VOLUME/diffusion_pipe/examples" ]; then
         rm -rf "$NETWORK_VOLUME/diffusion_pipe/examples"/*
         if [ -f "$NETWORK_VOLUME/runpod-diffusion_pipe/dataset.toml" ]; then
             mv "$NETWORK_VOLUME/runpod-diffusion_pipe/dataset.toml" "$NETWORK_VOLUME/diffusion_pipe/examples/"
+        fi
+        if [ -f "$NETWORK_VOLUME/runpod-diffusion_pipe/eval_dataset.toml" ]; then
+            mv "$NETWORK_VOLUME/runpod-diffusion_pipe/eval_dataset.toml" "$NETWORK_VOLUME/diffusion_pipe/examples/"
         fi
     fi
 fi
@@ -309,10 +317,15 @@ fi
 # Create dataset directories in the working directory
 mkdir -p "$NETWORK_VOLUME/image_dataset_here"
 mkdir -p "$NETWORK_VOLUME/video_dataset_here"
+mkdir -p "$NETWORK_VOLUME/eval_dataset_here"
 mkdir -p "$NETWORK_VOLUME/logs"
 # Update dataset.toml path to use the working directory
 if [ -f "$NETWORK_VOLUME/diffusion_pipe/examples/dataset.toml" ]; then
     sed -i "s|path = '/home/anon/data/images/grayscale'|path = '$NETWORK_VOLUME/image_dataset_here'|" "$NETWORK_VOLUME/diffusion_pipe/examples/dataset.toml"
+fi
+# Update eval_dataset.toml path to use the working directory
+if [ -f "$NETWORK_VOLUME/diffusion_pipe/examples/eval_dataset.toml" ]; then
+    sed -i "s|\\\$NETWORK_VOLUME/eval_dataset_here|$NETWORK_VOLUME/eval_dataset_here|" "$NETWORK_VOLUME/diffusion_pipe/examples/eval_dataset.toml"
 fi
 
 echo "Installing torch"
@@ -333,6 +346,7 @@ pip install git+https://github.com/huggingface/diffusers
 
 echo "================================================"
 echo "✅ Jupyter Lab is running and accessible via the web interface"
+echo "✅ TensorBoard is running on port 6006 for training loss monitoring"
 echo "================================================"
 
 sleep infinity

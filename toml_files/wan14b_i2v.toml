@@ -3,10 +3,11 @@ output_dir = '/data/diffusion_pipe_training_runs/wan14b_i2v_video_loras'
 
 # Dataset config file.
 dataset = 'examples/dataset.toml'
-# You can have separate eval datasets. Give them a name for Tensorboard metrics.
-# eval_datasets = [
-#     {name = 'something', config = 'path/to/eval_dataset.toml'},
-# ]
+# Eval dataset for measuring loss on held-out data (smooth loss curve in TensorBoard).
+# Place 5-15 captioned images in the eval_dataset_here/ folder.
+eval_datasets = [
+    {name = 'eval', config = 'examples/eval_dataset.toml'},
+]
 
 # training settings
 

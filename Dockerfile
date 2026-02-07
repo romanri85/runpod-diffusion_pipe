@@ -34,6 +34,8 @@ RUN grep -v -i "flash-attn\|flash-attention" /diffusion_pipe/requirements.txt > 
     pip install -r /tmp/requirements_no_flash.txt
 
 
+EXPOSE 8888 6006
+
 COPY src/start_script.sh /start_script.sh
 RUN chmod +x /start_script.sh
 CMD ["/start_script.sh"]

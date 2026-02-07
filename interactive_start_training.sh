@@ -358,6 +358,19 @@ echo ""
 print_success "Dataset validation completed successfully!"
 echo ""
 
+# Check eval dataset
+EVAL_DIR="$NETWORK_VOLUME/eval_dataset_here"
+EVAL_FILE_COUNT=$(find "$EVAL_DIR" -maxdepth 1 -type f \( -iname "*.jpg" -o -iname "*.jpeg" -o -iname "*.png" -o -iname "*.bmp" -o -iname "*.gif" -o -iname "*.tiff" -o -iname "*.webp" \) 2>/dev/null | wc -l)
+if [ "$EVAL_FILE_COUNT" -gt 0 ]; then
+    print_success "Eval dataset: $EVAL_FILE_COUNT image(s) found in eval_dataset_here/"
+    print_info "Eval loss will be computed every epoch and logged to TensorBoard."
+else
+    print_warning "Eval dataset is empty (eval_dataset_here/ folder)."
+    print_info "Add 5-15 captioned images to eval_dataset_here/ to track training loss."
+    print_info "You can use a small subset of your training images. Training will continue without eval."
+fi
+echo ""
+
 # Summary
 print_header "Training Configuration Summary"
 echo ""
