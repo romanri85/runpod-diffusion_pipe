@@ -116,10 +116,12 @@ echo "4) Wan 14B Text-To-Video (Supports both T2V and I2V)"
 echo "5) Wan 14B Image-To-Video (Not recommended, for advanced users only)"
 echo "6) Qwen Image"
 echo "7) Z Image Turbo"
+echo "8) Qwen Image Edit 2511"
+echo "9) Z Image Base"
 echo ""
 
 while true; do
-    read -p "Enter your choice (1-7): " model_choice
+    read -p "Enter your choice (1-9): " model_choice
     case $model_choice in
         1)
             MODEL_TYPE="flux"
@@ -163,8 +165,20 @@ while true; do
             TOML_FILE="z_image_toml.toml"
             break
             ;;
+        8)
+            MODEL_TYPE="qwen_image_edit"
+            MODEL_NAME="Qwen Image Edit 2511"
+            TOML_FILE="qwen_image_edit_toml.toml"
+            break
+            ;;
+        9)
+            MODEL_TYPE="z_image_base"
+            MODEL_NAME="Z Image Base"
+            TOML_FILE="z_image_base_toml.toml"
+            break
+            ;;
         *)
-            print_error "Invalid choice. Please enter a number between 1-7."
+            print_error "Invalid choice. Please enter a number between 1-9."
             ;;
     esac
 done
@@ -574,10 +588,57 @@ case $MODEL_TYPE in
         MODEL_DOWNLOAD_PID=$!
         ;;
 
+    "qwen_image_edit")
+        # Ensure examples directory exists
+        mkdir -p "$NETWORK_VOLUME/diffusion_pipe/examples"
+
+        # Check if file already exists in destination
+        if [ -f "$NETWORK_VOLUME/diffusion_pipe/examples/qwen_image_edit_toml.toml" ]; then
+            print_info "qwen_image_edit_toml.toml already exists in examples directory"
+            # Update output_dir even if file already exists
+            sed -i "s|^output_dir = .*|output_dir = '$NETWORK_VOLUME/output_folder/qwen_image_edit_lora'|" "$NETWORK_VOLUME/diffusion_pipe/examples/qwen_image_edit_toml.toml"
+        elif [ -f "$NETWORK_VOLUME/runpod-diffusion_pipe/toml_files/qwen_image_edit_toml.toml" ]; then
+            # Update output_dir before moving
+            sed -i "s|^output_dir = .*|output_dir = '$NETWORK_VOLUME/output_folder/qwen_image_edit_lora'|" "$NETWORK_VOLUME/runpod-diffusion_pipe/toml_files/qwen_image_edit_toml.toml"
+            mv "$NETWORK_VOLUME/runpod-diffusion_pipe/toml_files/qwen_image_edit_toml.toml" "$NETWORK_VOLUME/diffusion_pipe/examples/"
+            print_success "Moved qwen_image_edit_toml.toml to examples directory"
+        else
+            print_warning "qwen_image_edit_toml.toml not found at expected location: $NETWORK_VOLUME/runpod-diffusion_pipe/toml_files/qwen_image_edit_toml.toml"
+            print_warning "Please ensure the file exists or manually copy it to: $NETWORK_VOLUME/diffusion_pipe/examples/qwen_image_edit_toml.toml"
+        fi
+        print_info "Starting Qwen Image Edit 2511 model download in background..."
+        mkdir -p "$NETWORK_VOLUME/models/Qwen-Image"
+        mkdir -p "$NETWORK_VOLUME/models/qwen_image_edit"
+        (
+            # Download base Qwen-Image Diffusers model (VAE + text encoder) if not already present
+            if [ ! -d "$NETWORK_VOLUME/models/Qwen-Image/vae" ] || [ ! -d "$NETWORK_VOLUME/models/Qwen-Image/text_encoder" ]; then
+                echo "Downloading Qwen-Image base model (VAE + text encoder)..."
+                hf download Qwen/Qwen-Image --local-dir "$NETWORK_VOLUME/models/Qwen-Image"
+            else
+                echo "Qwen-Image base model already present, skipping base download..."
+            fi
+
+            # Download the Edit 2511 transformer weights
+            echo "Downloading Qwen-Image-Edit-2511 transformer weights (~40GB)..."
+            hf download Comfy-Org/Qwen-Image-Edit_ComfyUI split_files/diffusion_models/qwen_image_edit_2511_bf16.safetensors \
+                --local-dir "$NETWORK_VOLUME/models/qwen_image_edit_temp"
+
+            # Move from nested split_files structure to flat path
+            mv "$NETWORK_VOLUME/models/qwen_image_edit_temp/split_files/diffusion_models/qwen_image_edit_2511_bf16.safetensors" \
+                "$NETWORK_VOLUME/models/qwen_image_edit/"
+
+            # Clean up temp directory
+            rm -rf "$NETWORK_VOLUME/models/qwen_image_edit_temp"
+
+            echo "Qwen Image Edit 2511 model download complete!"
+        ) > "$NETWORK_VOLUME/logs/model_download.log" 2>&1 &
+        MODEL_DOWNLOAD_PID=$!
+        ;;
+
     "z_image_turbo")
         # Ensure examples directory exists
         mkdir -p "$NETWORK_VOLUME/diffusion_pipe/examples"
-        
+
         # Check if file already exists in destination
         if [ -f "$NETWORK_VOLUME/diffusion_pipe/examples/z_image_toml.toml" ]; then
             print_info "z_image_toml.toml already exists in examples directory"
@@ -614,6 +675,67 @@ case $MODEL_TYPE in
                 "https://huggingface.co/ostris/zimage_turbo_training_adapter/resolve/main/zimage_turbo_training_adapter_v2.safetensors"
             
             echo "Z Image Turbo model download complete!"
+        ) > "$NETWORK_VOLUME/logs/model_download.log" 2>&1 &
+        MODEL_DOWNLOAD_PID=$!
+        ;;
+
+    "z_image_base")
+        # Ensure examples directory exists
+        mkdir -p "$NETWORK_VOLUME/diffusion_pipe/examples"
+
+        # Check if file already exists in destination
+        if [ -f "$NETWORK_VOLUME/diffusion_pipe/examples/z_image_base_toml.toml" ]; then
+            print_info "z_image_base_toml.toml already exists in examples directory"
+            # Update output_dir even if file already exists
+            sed -i "s|^output_dir = .*|output_dir = '$NETWORK_VOLUME/output_folder/z_image_base_lora'|" "$NETWORK_VOLUME/diffusion_pipe/examples/z_image_base_toml.toml"
+        elif [ -f "$NETWORK_VOLUME/runpod-diffusion_pipe/toml_files/z_image_base_toml.toml" ]; then
+            # Update output_dir before moving
+            sed -i "s|^output_dir = .*|output_dir = '$NETWORK_VOLUME/output_folder/z_image_base_lora'|" "$NETWORK_VOLUME/runpod-diffusion_pipe/toml_files/z_image_base_toml.toml"
+            mv "$NETWORK_VOLUME/runpod-diffusion_pipe/toml_files/z_image_base_toml.toml" "$NETWORK_VOLUME/diffusion_pipe/examples/"
+            print_success "Moved z_image_base_toml.toml to examples directory"
+        else
+            print_warning "z_image_base_toml.toml not found at expected location: $NETWORK_VOLUME/runpod-diffusion_pipe/toml_files/z_image_base_toml.toml"
+            print_warning "Please ensure the file exists or manually copy it to: $NETWORK_VOLUME/diffusion_pipe/examples/z_image_base_toml.toml"
+        fi
+        print_info "Starting Z Image Base model download in background..."
+        mkdir -p "$NETWORK_VOLUME/models/z_image_base"
+        mkdir -p "$NETWORK_VOLUME/models/z_image"
+        (
+            echo "Downloading Z Image Base model from HuggingFace..."
+
+            # Download base diffusion model
+            hf download Comfy-Org/z_image split_files/diffusion_models/z_image_bf16.safetensors \
+                --local-dir "$NETWORK_VOLUME/models/z_image_base_temp"
+
+            echo "Moving diffusion model to final location..."
+            mv "$NETWORK_VOLUME/models/z_image_base_temp/split_files/diffusion_models/z_image_bf16.safetensors" \
+                "$NETWORK_VOLUME/models/z_image_base/"
+
+            # Download VAE and text encoder (shared with Turbo) if not already present
+            if [ ! -f "$NETWORK_VOLUME/models/z_image/ae.safetensors" ]; then
+                echo "Downloading VAE (ae.safetensors)..."
+                hf download Comfy-Org/z_image split_files/vae/ae.safetensors \
+                    --local-dir "$NETWORK_VOLUME/models/z_image_base_temp"
+                mv "$NETWORK_VOLUME/models/z_image_base_temp/split_files/vae/ae.safetensors" \
+                    "$NETWORK_VOLUME/models/z_image/"
+            else
+                echo "VAE already present at $NETWORK_VOLUME/models/z_image/ae.safetensors, skipping..."
+            fi
+
+            if [ ! -f "$NETWORK_VOLUME/models/z_image/qwen_3_4b.safetensors" ]; then
+                echo "Downloading text encoder (qwen_3_4b.safetensors)..."
+                hf download Comfy-Org/z_image split_files/text_encoders/qwen_3_4b.safetensors \
+                    --local-dir "$NETWORK_VOLUME/models/z_image_base_temp"
+                mv "$NETWORK_VOLUME/models/z_image_base_temp/split_files/text_encoders/qwen_3_4b.safetensors" \
+                    "$NETWORK_VOLUME/models/z_image/"
+            else
+                echo "Text encoder already present at $NETWORK_VOLUME/models/z_image/qwen_3_4b.safetensors, skipping..."
+            fi
+
+            # Clean up temp directory
+            rm -rf "$NETWORK_VOLUME/models/z_image_base_temp"
+
+            echo "Z Image Base model download complete!"
         ) > "$NETWORK_VOLUME/logs/model_download.log" 2>&1 &
         MODEL_DOWNLOAD_PID=$!
         ;;
@@ -818,6 +940,23 @@ if [ -n "$MODEL_DOWNLOAD_PID" ]; then
                 exit 1
             fi
             ;;
+        "qwen_image_edit")
+            missing_files=""
+            if [ ! -f "$NETWORK_VOLUME/models/qwen_image_edit/qwen_image_edit_2511_bf16.safetensors" ]; then
+                missing_files="$missing_files qwen_image_edit_2511_bf16.safetensors"
+            fi
+            if [ ! -d "$NETWORK_VOLUME/models/Qwen-Image/vae" ]; then
+                missing_files="$missing_files Qwen-Image/vae"
+            fi
+            if [ ! -d "$NETWORK_VOLUME/models/Qwen-Image/text_encoder" ]; then
+                missing_files="$missing_files Qwen-Image/text_encoder"
+            fi
+            if [ -n "$missing_files" ]; then
+                print_error "Qwen Image Edit 2511 model files missing after download:$missing_files"
+                print_error "Check log: $NETWORK_VOLUME/logs/model_download.log"
+                exit 1
+            fi
+            ;;
         "z_image_turbo")
             missing_files=""
             if [ ! -f "$NETWORK_VOLUME/models/z_image/z_image_turbo_bf16.safetensors" ]; then
@@ -834,6 +973,23 @@ if [ -n "$MODEL_DOWNLOAD_PID" ]; then
             fi
             if [ -n "$missing_files" ]; then
                 print_error "Z Image Turbo model files missing after download:$missing_files"
+                print_error "Check log: $NETWORK_VOLUME/logs/model_download.log"
+                exit 1
+            fi
+            ;;
+        "z_image_base")
+            missing_files=""
+            if [ ! -f "$NETWORK_VOLUME/models/z_image_base/z_image_bf16.safetensors" ]; then
+                missing_files="$missing_files z_image_base/z_image_bf16.safetensors"
+            fi
+            if [ ! -f "$NETWORK_VOLUME/models/z_image/ae.safetensors" ]; then
+                missing_files="$missing_files z_image/ae.safetensors"
+            fi
+            if [ ! -f "$NETWORK_VOLUME/models/z_image/qwen_3_4b.safetensors" ]; then
+                missing_files="$missing_files z_image/qwen_3_4b.safetensors"
+            fi
+            if [ -n "$missing_files" ]; then
+                print_error "Z Image Base model files missing after download:$missing_files"
                 print_error "Check log: $NETWORK_VOLUME/logs/model_download.log"
                 exit 1
             fi
@@ -1206,6 +1362,28 @@ fi
 # Add special warning for Z Image Turbo model initialization
 if [ "$MODEL_TYPE" = "z_image_turbo" ]; then
     print_warning "⚠️  IMPORTANT: Z Image Turbo model initialization can take several minutes."
+    print_warning "⚠️  The script may appear to hang during initialization - this is NORMAL."
+    print_warning "⚠️  As long as the script doesn't exit with an error, let it run."
+    echo ""
+    print_info "Waiting 10 seconds for you to read this message..."
+    sleep 10
+    echo ""
+fi
+
+# Add special warning for Z Image Base model initialization
+if [ "$MODEL_TYPE" = "z_image_base" ]; then
+    print_warning "⚠️  IMPORTANT: Z Image Base model initialization can take several minutes."
+    print_warning "⚠️  The script may appear to hang during initialization - this is NORMAL."
+    print_warning "⚠️  As long as the script doesn't exit with an error, let it run."
+    echo ""
+    print_info "Waiting 10 seconds for you to read this message..."
+    sleep 10
+    echo ""
+fi
+
+# Add special warning for Qwen Image Edit model initialization
+if [ "$MODEL_TYPE" = "qwen_image_edit" ]; then
+    print_warning "⚠️  IMPORTANT: Qwen Image Edit 2511 model initialization can take several minutes."
     print_warning "⚠️  The script may appear to hang during initialization - this is NORMAL."
     print_warning "⚠️  As long as the script doesn't exit with an error, let it run."
     echo ""

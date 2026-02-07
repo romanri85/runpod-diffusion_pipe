@@ -261,6 +261,9 @@ if [ -d "/tmp/runpod-diffusion_pipe" ]; then
                 # Handle commented paths too
                 sed -i "s|#transformer_path = '/models/|#transformer_path = '$NETWORK_VOLUME/models/|g" "$toml_file"
 
+                # Handle uncommented transformer_path (Qwen Image Edit)
+                sed -i "s|transformer_path = '/models/|transformer_path = '$NETWORK_VOLUME/models/|g" "$toml_file"
+
                 # Z-Image model paths
                 sed -i "s|diffusion_model = '/models/|diffusion_model = '$NETWORK_VOLUME/models/|g" "$toml_file"
                 sed -i "s|vae = '/models/|vae = '$NETWORK_VOLUME/models/|g" "$toml_file"
