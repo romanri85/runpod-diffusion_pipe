@@ -118,10 +118,11 @@ echo "6) Qwen Image"
 echo "7) Z Image Turbo"
 echo "8) Qwen Image Edit 2511"
 echo "9) Z Image Base"
+echo "10) LTX Video"
 echo ""
 
 while true; do
-    read -p "Enter your choice (1-9): " model_choice
+    read -p "Enter your choice (1-10): " model_choice
     case $model_choice in
         1)
             MODEL_TYPE="flux"
@@ -177,8 +178,14 @@ while true; do
             TOML_FILE="z_image_base_toml.toml"
             break
             ;;
+        10)
+            MODEL_TYPE="ltx_video"
+            MODEL_NAME="LTX Video"
+            TOML_FILE="ltx_video_toml.toml"
+            break
+            ;;
         *)
-            print_error "Invalid choice. Please enter a number between 1-9."
+            print_error "Invalid choice. Please enter a number between 1-10."
             ;;
     esac
 done
@@ -752,6 +759,30 @@ case $MODEL_TYPE in
         ) > "$NETWORK_VOLUME/logs/model_download.log" 2>&1 &
         MODEL_DOWNLOAD_PID=$!
         ;;
+
+    "ltx_video")
+        # Ensure examples directory exists
+        mkdir -p "$NETWORK_VOLUME/diffusion_pipe/examples"
+
+        # Check if file already exists in destination
+        if [ -f "$NETWORK_VOLUME/diffusion_pipe/examples/ltx_video_toml.toml" ]; then
+            print_info "ltx_video_toml.toml already exists in examples directory"
+            # Update output_dir even if file already exists
+            sed -i "s|^output_dir = .*|output_dir = '$NETWORK_VOLUME/output_folder/ltx_video_lora'|" "$NETWORK_VOLUME/diffusion_pipe/examples/ltx_video_toml.toml"
+        elif [ -f "$NETWORK_VOLUME/runpod-diffusion_pipe/toml_files/ltx_video_toml.toml" ]; then
+            # Update output_dir before moving
+            sed -i "s|^output_dir = .*|output_dir = '$NETWORK_VOLUME/output_folder/ltx_video_lora'|" "$NETWORK_VOLUME/runpod-diffusion_pipe/toml_files/ltx_video_toml.toml"
+            mv "$NETWORK_VOLUME/runpod-diffusion_pipe/toml_files/ltx_video_toml.toml" "$NETWORK_VOLUME/diffusion_pipe/examples/"
+            print_success "Moved ltx_video_toml.toml to examples directory"
+        else
+            print_warning "ltx_video_toml.toml not found at expected location: $NETWORK_VOLUME/runpod-diffusion_pipe/toml_files/ltx_video_toml.toml"
+            print_warning "Please ensure the file exists or manually copy it to: $NETWORK_VOLUME/diffusion_pipe/examples/ltx_video_toml.toml"
+        fi
+        print_info "Starting LTX Video model download in background..."
+        mkdir -p "$NETWORK_VOLUME/models/LTX-Video"
+        hf download Lightricks/LTX-Video --local-dir "$NETWORK_VOLUME/models/LTX-Video" > "$NETWORK_VOLUME/logs/model_download.log" 2>&1 &
+        MODEL_DOWNLOAD_PID=$!
+        ;;
 esac
 
 echo ""
@@ -1004,6 +1035,12 @@ if [ -n "$MODEL_DOWNLOAD_PID" ]; then
             if [ -n "$missing_files" ]; then
                 print_error "Z Image Base model files missing after download:$missing_files"
                 print_error "Check log: $NETWORK_VOLUME/logs/model_download.log"
+                exit 1
+            fi
+            ;;
+        "ltx_video")
+            if [ ! -d "$NETWORK_VOLUME/models/LTX-Video" ] || [ -z "$(ls -A "$NETWORK_VOLUME/models/LTX-Video" 2>/dev/null)" ]; then
+                print_error "LTX Video model files not found after download. Check log: $NETWORK_VOLUME/logs/model_download.log"
                 exit 1
             fi
             ;;
@@ -1386,6 +1423,17 @@ fi
 # Add special warning for Z Image Base model initialization
 if [ "$MODEL_TYPE" = "z_image_base" ]; then
     print_warning "⚠️  IMPORTANT: Z Image Base model initialization can take several minutes."
+    print_warning "⚠️  The script may appear to hang during initialization - this is NORMAL."
+    print_warning "⚠️  As long as the script doesn't exit with an error, let it run."
+    echo ""
+    print_info "Waiting 10 seconds for you to read this message..."
+    sleep 10
+    echo ""
+fi
+
+# Add special warning for LTX Video model initialization
+if [ "$MODEL_TYPE" = "ltx_video" ]; then
+    print_warning "⚠️  IMPORTANT: LTX Video model initialization can take several minutes."
     print_warning "⚠️  The script may appear to hang during initialization - this is NORMAL."
     print_warning "⚠️  As long as the script doesn't exit with an error, let it run."
     echo ""
